@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr" data-critters-container>
+  <head>
+    <meta charset="utf-8">
+
+    <!-- Titre onglet / SEO de base -->
+    <title>Système solaire réel – Visualisation temps réel (NASA JPL Horizons)</title>
+
+    <!-- Base pour Angular routing -->
+    <base href="/">
+
+    <!-- Responsive -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+
+    <!-- Description pour moteurs de recherche et prévisualisations -->
+    <meta name="description" content="Visualisation en temps quasi réel des positions des 8 planètes autour du Soleil, basée sur des éphémérides externes (NASA JPL Horizons), sans simulation locale arbitraire.">
+
+    <!-- Mots-clés de base -->
+    <meta name="keywords" content="système solaire, NASA, JPL Horizons, éphémérides, temps réel, visualisation, planètes">
+
+    <!-- Auteur (adapter si tu veux mettre ton nom) -->
+    <meta name="author" content="Vincent Rousseau">
+
+    <!-- Couleur de thème (mobile / PWA) -->
+    <meta name="theme-color" content="#050510">
+
+    <!-- Favicon & icônes (à adapter si tu ajoutes de vrais fichiers dans src/assets) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+    <link rel="manifest" href="assets/manifest.webmanifest">
+
+    <!-- Open Graph (prévisualisation réseaux sociaux) -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Système solaire – données réelles (NASA JPL Horizons)">
+    <meta property="og:description" content="Visualisation des positions des planètes du système solaire en temps quasi réel, à partir d’éphémérides NASA JPL Horizons.">
+    <meta property="og:locale" content="fr_FR">
+    <meta property="og:url" content="https://example.com/">
+    <meta property="og:image" content="https://example.com/assets/preview/solar-system-preview.png">
+
+    <!-- Twitter cards (si tu partages le lien sur X/Twitter) -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Système solaire – données réelles (NASA JPL Horizons)">
+    <meta name="twitter:description" content="Visualisation en temps quasi réel des positions planétaires, basée sur les éphémérides NASA JPL Horizons.">
+    <meta name="twitter:image" content="https://example.com/assets/preview/solar-system-preview.png">
+
+    <!-- Préchargement police système (optionnel, tu restes sur system-ui par défaut) -->
+    <style>
+      /* Fail-safe minimal au cas où les styles globaux Angular se chargent plus tard */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #0b1027 0%, #050514 50%, #02020a 100%);
+        color: #f5f5ff;
+      }
+
+      body {
+        display: flex;
+      }
+
+      app-root {
+        flex: 1;
+        display: flex;
+        min-height: 100vh;
+      }
+    </style>
+  <style>*,*:before,*:after{box-sizing:border-box}html{margin:0;padding:0;height:100%;scroll-behavior:smooth}:root{--app-bg:radial-gradient(circle at top, #0b1027 0%, #050514 50%, #02020a 100%);--text-main:#f5f5ff;--text-muted:#b7bbdd;--accent:#3b82f6;--accent-soft:rgba(59, 130, 246, .18);--border-soft:rgba(255, 255, 255, .06);--border-strong:rgba(255, 255, 255, .16)}html,body{margin:0;padding:0;height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;font-size:14px;line-height:1.5;background:var(--app-bg);color:var(--text-main)}body{display:flex;min-height:100vh}app-root{flex:1;display:flex;min-height:100vh}@media (prefers-reduced-motion: reduce){*,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}@media (max-width: 768px){html,body{font-size:13px}}</style><link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="styles.css"></noscript></head>
+
+  <body>
+    <app-root></app-root>
+    <!-- Angular bundle scripts sont injectés automatiquement par le build -->
+  <script src="runtime.js" type="module"></script><script src="main.js" type="module"></script></body>
+</html>

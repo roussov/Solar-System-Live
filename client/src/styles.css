@@ -1,0 +1,185 @@
+/* ==========================================================================
+   Reset et fondation globale
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  /* Anti-jitter lors du scroll */
+  scroll-behavior: smooth;
+}
+
+/* Global theme tokens */
+:root {
+  --app-bg: radial-gradient(circle at top, #0b1027 0%, #050514 50%, #02020a 100%);
+  --text-main: #f5f5ff;
+  --text-muted: #b7bbdd;
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.18);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.16);
+}
+
+/* Base body + typographie globale */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--app-bg);
+  color: var(--text-main);
+}
+
+body {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Racine Angular */
+app-root {
+  flex: 1;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ==========================================================================
+   Éléments de base
+   ========================================================================== */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  margin: 0 0 0.4em 0;
+  color: var(--text-main);
+}
+
+p {
+  margin: 0 0 0.75em 0;
+  color: var(--text-main);
+}
+
+ul,
+ol {
+  margin: 0 0 0.75em 1.25em;
+  padding: 0;
+}
+
+li {
+  margin: 0.15em 0;
+}
+
+/* Liens */
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 140ms ease-out, text-shadow 140ms ease-out;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Boutons par défaut */
+button {
+  font-family: inherit;
+  font-size: 13px;
+}
+
+/* Champs de formulaire de base */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-main);
+  background: rgba(10, 10, 30, 0.9);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Accessibilité & utilitaires
+   ========================================================================== */
+
+/* Élément uniquement pour lecteurs d'écran */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+}
+
+/* Réduction des animations si l’utilisateur préfère */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Scrollbars (WebKit-like) – optionnel
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(5, 5, 20, 0.9);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.8);
+}
+
+/* ==========================================================================
+   Layout global responsive
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  html,
+  body {
+    font-size: 13px;
+  }
+}

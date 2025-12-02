@@ -1,0 +1,187 @@
+:host {
+  display: block;
+  /* Variables locales au composant (facile à retoucher) */
+  --panel-bg: radial-gradient(circle at top left, #2b2b4a 0%, #141427 55%, #05050d 100%);
+  --panel-border: rgba(255, 255, 255, 0.06);
+  --panel-shadow: 0 14px 45px rgba(0, 0, 0, 0.75);
+  --panel-radius: 14px;
+
+  --text-main: #f5f5ff;
+  --text-muted: #b7bbdd;
+  --text-soft: #9fa3d1;
+
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.15);
+
+  --divider: rgba(255, 255, 255, 0.06);
+  --chip-bg: rgba(255, 255, 255, 0.06);
+}
+
+/* Animation d’apparition subtile */
+@keyframes panel-fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Carte principale */
+.panel {
+  position: relative;
+  box-sizing: border-box;
+
+  min-width: 260px;
+  max-width: 360px;
+  padding: 18px 18px 16px 18px;
+
+  border-radius: var(--panel-radius);
+  background: var(--panel-bg);
+  color: var(--text-main);
+
+  box-shadow:
+    var(--panel-shadow),
+    0 0 0 1px var(--panel-border);
+
+  backdrop-filter: blur(10px);
+
+  animation: panel-fade-in-up 180ms ease-out;
+}
+
+/* Bouton de fermeture */
+.close-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 999px;
+
+  transition:
+    background 0.16s ease,
+    transform 0.1s ease,
+    box-shadow 0.16s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.close-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Titre planète */
+.panel h2 {
+  margin: 0 26px 6px 0; /* laisser la place pour le bouton */
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Soulignement léger sous le titre */
+.panel h2::after {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 2px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent), transparent);
+}
+
+/* Description */
+.panel p {
+  margin: 8px 0 14px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Bloc liste des caractéristiques */
+.panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 10px 0 0 0;
+  border-top: 1px solid var(--divider);
+}
+
+/* Ligne de caractéristique */
+.panel li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+
+  padding: 5px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-main);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.panel li:last-child {
+  border-bottom: none;
+}
+
+/* Si tu gardes le texte brut dans <li>, ça passe.
+   Si tu ajoutes deux <span> (label / valeur), tu peux affiner : */
+
+/* Label (première partie) */
+.panel li span:first-child {
+  color: var(--text-soft);
+}
+
+/* Valeur (deuxième partie) */
+.panel li span:last-child {
+  font-weight: 500;
+}
+
+/* Variante “chip” pour les valeurs très longues (au besoin) */
+.panel li span.value-chip {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+}
+
+/* Petits écrans */
+@media (max-width: 768px) {
+  .panel {
+    max-width: 100%;
+    padding: 16px;
+  }
+
+  .panel h2 {
+    font-size: 17px;
+  }
+}
+
+/* Très petits écrans */
+@media (max-width: 480px) {
+  .panel {
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .panel h2 {
+    font-size: 16px;
+  }
+
+  .panel p,
+  .panel li {
+    font-size: 12px;
+  }
+}

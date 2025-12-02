@@ -1,0 +1,264 @@
+<div class="solar-system-layout">
+  <!-- Colonne gauche : contrôles + vue SVG + échelle -->
+  <div class="left-pane">
+    <div class="controls-stack">
+      <!-- Switch 2D / 3D -->
+      <div
+        class="controls"
+        role="radiogroup"
+        aria-label="Mode d'affichage du système solaire"
+      >
+        <button
+          type="button"
+          (click)="setViewMode('2d')"
+          [class.active]="viewMode === '2d'"
+          role="radio"
+          [attr.aria-checked]="viewMode === '2d'"
+        >
+          Vue 2D (vue du dessus)
+        </button>
+
+        <button
+          type="button"
+          (click)="setViewMode('3d')"
+          [class.active]="viewMode === '3d'"
+          role="radio"
+          [attr.aria-checked]="viewMode === '3d'"
+        >
+          Vue 3D (projection oblique)
+        </button>
+      </div>
+
+      <!-- Timelapse -->
+      <div class="timelapse-panel" aria-label="Contrôles de timelapse">
+        <div class="timelapse-row">
+          <div class="timelapse-label">
+            Timelapse éphémérides
+            <span class="tag">jour / semaine / mois</span>
+          </div>
+
+          <div class="timelapse-buttons">
+            <button type="button" [class.active]="timeStepDays === 1" (click)="setTimeStep(1)">Jour</button>
+            <button type="button" [class.active]="timeStepDays === 7" (click)="setTimeStep(7)">Semaine</button>
+            <button type="button" [class.active]="timeStepDays === 30" (click)="setTimeStep(30)">Mois</button>
+            <button type="button" class="ghost" (click)="resetTimeOffset()">Réinitialiser</button>
+          </div>
+        </div>
+
+        <div class="timelapse-slider">
+          <input
+            type="range"
+            [min]="-maxTimeOffsetDays"
+            [max]="maxTimeOffsetDays"
+            [step]="timeStepDays"
+            [value]="timeOffsetDays"
+            (input)="onTimeOffsetChange($event)"
+            aria-label="Décalage temporel en jours"
+          />
+          <div class="timelapse-values">
+            <span>Déplacement : {{ timeOffsetDays | number: '1.0-1' }} j</span>
+            <span *ngIf="lastUpdateTimestamp">
+              Référence : {{ lastUpdateTimestamp }}
+            </span>
+          </div>
+        </div>
+
+        <div class="inertial-toggle">
+          <label>
+            <input
+              type="checkbox"
+              [checked]="enableInertialPlayback"
+              (change)="onToggleInertialPlayback($any($event.target).checked)"
+            />
+            Lecture inertielle (réel + vx/vy/vz)
+          </label>
+          <span class="inertial-hint">
+            Continue d’animer entre deux fetchs en utilisant les vitesses {{ metadata?.velocityUnit || 'AU/j' }}.
+          </span>
+        </div>
+
+        <div class="view-toggles" *ngIf="viewMode === '3d'">
+          <label>
+            <input type="checkbox" [checked]="showOrbitalPlanes" (change)="onToggleOrbitPlanes($any($event.target).checked)" />
+            Plans orbitaux visibles
+          </label>
+          <label>
+            <input type="checkbox" [checked]="showPlanetAxes" (change)="onTogglePlanetAxes($any($event.target).checked)" />
+            Axes planétaires
+          </label>
+          <label>
+            <input type="checkbox" [checked]="showShadows" (change)="onToggleShadows($any($event.target).checked)" />
+            Ombres portées
+          </label>
+        </div>
+      </div>
+
+      <div class="focus-status" *ngIf="focusedPlanet as focus">
+        <div class="focus-chip">
+          <span class="focus-dot" [style.background]="focus.color"></span>
+          Vue centrée sur {{ focus.displayName }}
+        </div>
+        <button type="button" class="ghost" (click)="clearFocus()">Vue globale</button>
+      </div>
+
+      <!-- Qualité / source -->
+      <div class="data-quality" *ngIf="metadata">
+        <div>Source : {{ metadata?.source || 'NASA-JPL-Horizons' }}</div>
+        <div>Repère : {{ metadata?.referenceFrame || 'J2000-ECLIPTIC' }}</div>
+        <div>Unités : {{ metadata?.distanceUnit || 'AU' }} / {{ metadata?.velocityUnit || 'AU/day' }}</div>
+        <div *ngIf="metadata?.responseTimeMs">Latence API : {{ metadata?.responseTimeMs | number:'1.0-0' }} ms</div>
+      </div>
+
+      <!-- Légende couleurs -->
+      <div class="color-legend">
+        <button
+          type="button"
+          *ngFor="let p of planets"
+          class="legend-item"
+          [class.active]="selectedPlanet?.name === p.name || focusPlanetName === p.name"
+          (click)="onLegendSelect(p)"
+        >
+          <span class="legend-dot" [style.background]="p.color"></span>
+          {{ p.displayName }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Vue principale du système solaire -->
+    <svg
+      class="solar-system-svg"
+      [attr.width]="width"
+      [attr.height]="height"
+      [attr.viewBox]="'0 0 ' + width + ' ' + height"
+      role="img"
+      aria-labelledby="solarTitle solarDesc"
+    >
+      <title id="solarTitle">Système solaire – positions en temps réel</title>
+      <desc id="solarDesc">
+        Visualisation des 8 planètes autour du Soleil. Les positions sont basées
+        sur des éphémérides temps réel fournies par le backend.
+      </desc>
+
+      <!-- Soleil (réduit pour ne pas masquer les planètes) -->
+      <defs>
+        <radialGradient id="sunGradient">
+          <stop offset="0%" stop-color="#ffffdd" />
+          <stop offset="70%" stop-color="#ffcc33" />
+          <stop offset="100%" stop-color="#dd8800" />
+        </radialGradient>
+      </defs>
+
+      <circle
+        [attr.cx]="centerX"
+        [attr.cy]="centerY"
+        [attr.r]="15"
+        fill="url(#sunGradient)"
+      ></circle>
+
+      <!-- Plans orbitaux (vue 3D) -->
+      <g class="orbit-planes" *ngIf="viewMode === '3d' && showOrbitalPlanes">
+        <ellipse
+          *ngFor="let p of planets"
+          [attr.cx]="centerX"
+          [attr.cy]="centerY"
+          [attr.rx]="getOrbitRadiusPx(p)"
+          [attr.ry]="getOrbitRadiusPx(p) * orbitPlaneCompression(p)"
+          class="orbit-plane"
+        ></ellipse>
+      </g>
+
+      <!-- Orbites (uniquement en vue 2D pour lisibilité) -->
+      <g class="orbits" *ngIf="viewMode === '2d'">
+        <circle
+          *ngFor="let p of planets"
+          [attr.cx]="centerX"
+          [attr.cy]="centerY"
+          [attr.r]="getOrbitRadiusPx(p)"
+          class="orbit-circle"
+        ></circle>
+      </g>
+
+      <!-- Ombres portées (vue 3D uniquement) -->
+      <g class="shadows" *ngIf="viewMode === '3d' && showShadows">
+        <ellipse
+          *ngFor="let dp of displayPlanets"
+          [attr.cx]="dp.shadow?.cx"
+          [attr.cy]="dp.shadow?.cy"
+          [attr.rx]="dp.shadow?.rx"
+          [attr.ry]="dp.shadow?.ry"
+          class="shadow-ellipse"
+        ></ellipse>
+      </g>
+
+      <!-- Axes planétaires (vue 3D) -->
+      <g class="axes" *ngIf="viewMode === '3d' && showPlanetAxes">
+        <line
+          *ngFor="let dp of displayPlanets"
+          [attr.x1]="dp.axis?.x1"
+          [attr.y1]="dp.axis?.y1"
+          [attr.x2]="dp.axis?.x2"
+          [attr.y2]="dp.axis?.y2"
+          class="axis-line"
+        ></line>
+      </g>
+
+      <!-- Planètes (positions injectées depuis les éphémérides réelles) -->
+      <g class="planets" aria-label="Planètes du système solaire">
+        <circle
+          *ngFor="let dp of displayPlanets"
+          [attr.cx]="dp.x"
+          [attr.cy]="dp.y"
+          [attr.r]="planetRadiusToPixels(dp.planet)"
+          [attr.fill]="dp.planet.color"
+          (click)="onPlanetClick(dp.planet)"
+          class="planet-circle"
+          [class.selected]="dp.isSelected"
+          [class.focused]="dp.isFocused"
+        >
+          <title>{{ dp.planet.displayName }}</title>
+        </circle>
+      </g>
+    </svg>
+
+    <!-- Échelle 1 UA -->
+    <div class="scale-container">
+      <div class="scale-label">
+        Échelle radiale (compressée) – 1 UA
+      </div>
+
+      <div class="scale-bar-wrapper" aria-hidden="true">
+        <div
+          class="scale-bar"
+          [style.width.px]="oneAuPixels"
+        ></div>
+      </div>
+
+      <div class="scale-text">
+        1 unité astronomique ≈ distance moyenne Terre–Soleil
+        (≈&nbsp;149&nbsp;600&nbsp;000&nbsp;km).  
+        L’échelle radiale est compressée pour garder toutes les planètes visibles.
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne droite : panneau d'information planète -->
+  <div class="right-pane">
+    <div class="selected-actions" *ngIf="selectedPlanet || focusPlanetName">
+      <button type="button" *ngIf="selectedPlanet" (click)="centerOnSelected()">Centrer sur {{ selectedPlanet.displayName }}</button>
+      <button type="button" class="ghost" *ngIf="focusPlanetName" (click)="clearFocus()">Vue globale</button>
+    </div>
+
+    <app-planet-info-panel
+      *ngIf="selectedPlanet"
+      [planet]="selectedPlanet"
+      (close)="onCloseInfo()"
+    ></app-planet-info-panel>
+
+    <div class="placeholder" *ngIf="!selectedPlanet">
+      <p>
+        Cliquez sur une planète dans la vue pour afficher ses caractéristiques
+        physiques et orbitales.
+      </p>
+    </div>
+  </div>
+</div>

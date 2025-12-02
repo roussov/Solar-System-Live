@@ -1,0 +1,16 @@
+[build]
+  base = "client"
+  command = "npm install && npm run build"
+  publish = "dist/solar-system-real-client"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Décommente et adapte cette section pour proxyfier l’API vers ton backend (même domaine Netlify)
+# [[redirects]]
+#   from = "/api/ephemeris/*"
+#   to = "https://your-backend.example.com/api/ephemeris/:splat"
+#   status = 200
+#   force = true

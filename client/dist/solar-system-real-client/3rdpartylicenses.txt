@@ -1,0 +1,11 @@
+@angular/common
+MIT
+
+@angular/core
+MIT
+
+@angular/platform-browser
+MIT
+
+rxjs
+Apache-2.0

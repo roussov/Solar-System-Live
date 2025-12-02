@@ -1,0 +1,713 @@
+:host {
+  display: block;
+  /* Variables de thème locales au composant */
+  --bg-page: #050510;
+  --bg-panel: #050510;
+  --bg-svg: radial-gradient(circle at center, #000015 0%, #000000 65%, #020208 100%);
+
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  --text-main: #f5f5ff;
+  --text-muted: #b7bbdd;
+  --text-soft: #8a8fb8;
+
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.24);
+  --accent-subtle: rgba(59, 130, 246, 0.1);
+
+  --orbit-color: rgba(255, 255, 255, 0.12);
+  --planet-stroke: rgba(255, 255, 255, 0.9);
+
+  --shadow-strong: 0 18px 60px rgba(0, 0, 0, 0.9);
+  --shadow-soft: 0 0 0 1px rgba(255, 255, 255, 0.02);
+
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+
+  --transition-fast: 140ms ease-out;
+  --transition-med: 200ms ease;
+
+  color: var(--text-main);
+}
+
+/* Animations de base */
+@keyframes solar-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes planet-pulse {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+  }
+  50% {
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+  }
+}
+
+/* Layout principal */
+.solar-system-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+/* Colonne gauche : commandes + SVG + échelle */
+.left-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.controls-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Colonne droite : panneau d’info */
+.right-pane {
+  flex: 0 0 auto;
+  min-width: 260px;
+  max-width: 360px;
+}
+
+.selected-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.selected-actions button {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.selected-actions button:hover {
+  transform: translateY(-1px);
+}
+
+.selected-actions button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.selected-actions button.ghost {
+  background: transparent;
+  color: var(--text-soft);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.selected-actions button.ghost:hover {
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Contrôles (Switch 2D / 3D)                                               */
+/* ------------------------------------------------------------------------- */
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(10, 10, 30, 0.9);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  width: fit-content;
+  animation: solar-fade-in 180ms ease-out;
+}
+
+.controls button {
+  position: relative;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform 0.08s ease-out;
+}
+
+.controls button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.16), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.controls button:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.controls button:hover::before {
+  opacity: 0.6;
+}
+
+.controls button:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: none;
+}
+
+.controls button.active {
+  color: #ffffff;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 10px 25px rgba(59, 130, 246, 0.45);
+}
+
+.controls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Timelapse                                                                 */
+/* ------------------------------------------------------------------------- */
+
+.timelapse-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(10, 10, 30, 0.75);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.timelapse-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.timelapse-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timelapse-label .tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-soft);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.timelapse-buttons {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.timelapse-buttons button {
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform 0.08s ease-out,
+    box-shadow var(--transition-fast);
+}
+
+.timelapse-buttons button:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.timelapse-buttons button.active {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+}
+
+.timelapse-buttons button.ghost {
+  background: transparent;
+  border-style: dashed;
+}
+
+.timelapse-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timelapse-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.timelapse-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.inertial-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  margin-top: 2px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.inertial-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.inertial-toggle input {
+  accent-color: var(--accent);
+}
+
+.inertial-hint {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.view-toggles {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.view-toggles input {
+  accent-color: var(--accent);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Qualité des données / légende                                            */
+/* ------------------------------------------------------------------------- */
+
+.data-quality {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(5, 10, 25, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.color-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition:
+    border-color var(--transition-fast),
+    transform 80ms ease-out,
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.legend-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.legend-item:active {
+  transform: translateY(1px);
+}
+
+.legend-item.active {
+  color: #fff;
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
+}
+
+.legend-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  display: inline-block;
+}
+
+.focus-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.16), rgba(59, 130, 246, 0.05));
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.focus-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+}
+
+.focus-status .ghost {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), transform 0.08s ease-out;
+}
+
+.focus-status .ghost:hover {
+  color: var(--accent);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Zone SVG – Système solaire                                               */
+/* ------------------------------------------------------------------------- */
+
+.solar-system-svg {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 1 / 1;
+  height: auto;
+
+  background: var(--bg-svg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-strong), var(--shadow-soft);
+
+  animation: solar-fade-in 220ms ease-out;
+}
+
+/* Groupe des orbites */
+.orbits {
+  pointer-events: none;
+}
+
+.orbit-circle {
+  fill: none;
+  stroke: var(--orbit-color);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  transition: stroke var(--transition-med), stroke-width var(--transition-med);
+}
+
+/* Plans orbitaux (vue 3D) */
+.orbit-planes {
+  pointer-events: none;
+}
+
+.orbit-plane {
+  fill: rgba(59, 130, 246, 0.06);
+  stroke: rgba(255, 255, 255, 0.04);
+  stroke-width: 1;
+  filter: blur(0.4px);
+}
+
+/* Groupe des planètes */
+.planets {
+  cursor: default;
+}
+
+/* Planètes cliquables */
+.planet-circle {
+  cursor: pointer;
+  stroke: var(--planet-stroke);
+  stroke-width: 0.5;
+  transition:
+    transform var(--transition-fast),
+    stroke-width var(--transition-fast),
+    filter var(--transition-fast);
+  transform-origin: center center;
+}
+
+.planet-circle:hover {
+  stroke-width: 1.1;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+  transform: scale(1.05);
+}
+
+.planet-circle:active {
+  transform: scale(0.98);
+}
+
+/* Au besoin, classe pour surligner la planète sélectionnée (si tu l’ajoutes côté TS) */
+.planet-circle.selected {
+  animation: planet-pulse 1200ms ease-in-out infinite;
+}
+
+.planet-circle.focused {
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.85));
+}
+
+/* Ombres portées (vue 3D) */
+.shadow-ellipse {
+  fill: rgba(0, 0, 0, 0.4);
+  filter: blur(4px);
+}
+
+/* Axes planétaires */
+.axes {
+  pointer-events: none;
+}
+
+.axis-line {
+  stroke: rgba(255, 255, 255, 0.7);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Échelle 1 UA                                                              */
+/* ------------------------------------------------------------------------- */
+
+.scale-container {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+}
+
+.scale-label {
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.scale-bar-wrapper {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+/* Barre représentant la longueur correspondant à 1 UA (en pixels) */
+.scale-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    #7dd3fc,
+    var(--accent)
+  );
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+  transform-origin: left center;
+}
+
+/* Graduation décorative */
+.scale-bar-wrapper::before,
+.scale-bar-wrapper::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translateY(-50%);
+}
+
+.scale-bar-wrapper::before {
+  left: 0;
+}
+
+.scale-bar-wrapper::after {
+  right: 0;
+}
+
+.scale-text {
+  font-style: italic;
+  color: var(--text-soft);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Responsivité                                                              */
+/* ------------------------------------------------------------------------- */
+
+@media (max-width: 1200px) {
+  .solar-system-layout {
+    gap: 16px;
+  }
+
+  .right-pane {
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .solar-system-layout {
+    flex-direction: column;
+  }
+
+  .left-pane {
+    order: 1;
+  }
+
+  .right-pane {
+    order: 2;
+    max-width: 100%;
+  }
+
+  .solar-system-svg {
+    margin-inline: auto;
+  }
+
+  .scale-container {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .controls {
+    padding: 3px;
+    gap: 4px;
+  }
+
+  .controls button {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+
+  .solar-system-svg {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .solar-system-layout {
+    gap: 12px;
+  }
+
+  .controls {
+    border-radius: var(--radius-md);
+  }
+
+  .scale-container {
+    font-size: 11px;
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Accessibilité & états focus                                               */
+/* ------------------------------------------------------------------------- */
+
+.solar-system-svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
