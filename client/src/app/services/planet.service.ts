@@ -100,6 +100,20 @@ export class PlanetService {
       inclinationDeg: 1.77,
       axialTiltDeg: 28.32,
       info: 'Géante de glace la plus éloignée, vents supersoniques.'
+    },
+    {
+      name: 'pluto',
+      displayName: 'Pluton',
+      color: '#d7c7ba',
+      radiusKm: 1188.3,
+      massKg: 1.303e22,
+      semiMajorAxisAU: 39.482,
+      orbitalPeriodDays: 90560,
+      eccentricity: 0.2488,
+      inclinationDeg: 17.16,
+      axialTiltDeg: 122.53,
+      category: 'dwarf',
+      info: 'Planète naine de la ceinture de Kuiper, orbite excentrique et inclinée.'
     }
   ];
 

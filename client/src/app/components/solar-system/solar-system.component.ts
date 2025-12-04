@@ -9,8 +9,7 @@ import { Subscription, interval, startWith, switchMap, finalize, Observable } fr
 import {
   Planet,
   EphemerisSnapshot,
-  PlanetPosition,
-  Moon
+  PlanetPosition
 } from '../../models/planet';
 import { PlanetService } from '../../services/planet.service';
 import { RealEphemerisService } from '../../services/real-ephemeris.service';
@@ -36,7 +35,7 @@ interface DisplayPlanet {
 })
 export class SolarSystemComponent implements OnInit, OnDestroy {
   /**
-   * Métadonnées des 8 planètes (rayon, masse, demi-grand axe…).
+   * Métadonnées des planètes (rayon, masse, demi-grand axe…).
    * Fournies par PlanetService (valeurs physiques “moyennes”).
    */
   planets: Planet[] = [];

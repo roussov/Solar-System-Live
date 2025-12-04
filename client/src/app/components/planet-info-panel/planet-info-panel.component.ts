@@ -87,6 +87,8 @@ export class PlanetInfoPanelComponent implements OnChanges {
       case 'uranus':
       case 'neptune':
         return 'Géante de glace';
+      case 'pluto':
+        return 'Planète naine';
       default:
         return 'Planète';
     }

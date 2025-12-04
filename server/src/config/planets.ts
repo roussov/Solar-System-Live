@@ -6,7 +6,8 @@ export type PlanetName =
   | 'jupiter'
   | 'saturn'
   | 'uranus'
-  | 'neptune';
+  | 'neptune'
+  | 'pluto';
 
 export interface PlanetConfig {
   name: PlanetName;
@@ -22,5 +23,6 @@ export const PLANETS: PlanetConfig[] = [
   { name: 'jupiter', displayName: 'Jupiter',  horizonsId: '599' },
   { name: 'saturn',  displayName: 'Saturne',  horizonsId: '699' },
   { name: 'uranus',  displayName: 'Uranus',   horizonsId: '799' },
-  { name: 'neptune', displayName: 'Neptune',  horizonsId: '899' }
+  { name: 'neptune', displayName: 'Neptune',  horizonsId: '899' },
+  { name: 'pluto',   displayName: 'Pluton',   horizonsId: '999' }
 ];

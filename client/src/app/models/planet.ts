@@ -1,5 +1,5 @@
 /**
- * Identifiant interne des 8 planètes principales.
+ * Identifiant interne des planètes principales + Pluton.
  * Utilisé pour lier les données physiques, les couleurs et les éphémérides.
  */
 export type PlanetName =
@@ -10,7 +10,8 @@ export type PlanetName =
   | 'jupiter'
   | 'saturn'
   | 'uranus'
-  | 'neptune';
+  | 'neptune'
+  | 'pluto';
 
 /**
  * Classe simple de planète (utile pour les filtres, légendes, styles).
@@ -18,7 +19,8 @@ export type PlanetName =
 export type PlanetCategory =
   | 'terrestrial'  // Mercure, Vénus, Terre, Mars
   | 'gas-giant'    // Jupiter, Saturne
-  | 'ice-giant';   // Uranus, Neptune
+  | 'ice-giant'    // Uranus, Neptune
+  | 'dwarf';       // Pluton et autres planètes naines
 
 /**
  * Métadonnées physiques et “catalogue” pour une planète.

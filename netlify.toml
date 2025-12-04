@@ -1,7 +1,7 @@
 [build]
-  base = "client"
-  command = "npm install && npm run build"
-  publish = "dist/solar-system-real-client"
+  # Run the frontend build from the repo root so Netlify doesn’t look for a package.json at the top level.
+  command = "npm --prefix client install && npm --prefix client run build"
+  publish = "client/dist/solar-system-real-client"
 
 [[redirects]]
   from = "/*"

@@ -1,7 +1,7 @@
 # Solar System Real – Angular + Node + NASA JPL Horizons
 
-Projet de démonstration pour visualiser en temps réel la position des 8 planètes
-du système solaire autour du Soleil, en se basant sur des éphémérides réelles
+Projet de démonstration pour visualiser en temps réel la position des planètes
+du système solaire (Pluton incluse) autour du Soleil, en se basant sur des éphémérides réelles
 (NASA JPL Horizons, via une API Node/Express), et non sur une simulation locale.
 
 ## Structure
