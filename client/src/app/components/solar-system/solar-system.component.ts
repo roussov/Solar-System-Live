@@ -13,6 +13,9 @@ import {
 } from '../../models/planet';
 import { PlanetService } from '../../services/planet.service';
 import { RealEphemerisService } from '../../services/real-ephemeris.service';
+import { VoyagerService } from '../../services/voyager.service';
+import { VoyagerData, VoyagerSnapshot } from '../../models/voyager';
+import { DsnContact, DsnService } from '../../services/dsn.service';
 
 type ViewMode = '2d' | '3d';
 type PlanetNameType = Planet['name'];
@@ -27,6 +30,62 @@ interface DisplayPlanet {
   axis?: { x1: number; y1: number; x2: number; y2: number };
   shadow?: { cx: number; cy: number; rx: number; ry: number };
 }
+
+interface VoyagerMarker {
+  id: VoyagerData['id'];
+  name: string;
+  x: number;
+  y: number;
+  rAu: number;
+  distanceLabel: string;
+  color: string;
+}
+
+interface VoyagerView extends VoyagerData {
+  distanceFromEarth: {
+    au: number | null;
+    km: number | null;
+    miles: number | null;
+    lightTimeMin?: number | null;
+    lightTimeHours?: number | null;
+  };
+  lightTime: Required<NonNullable<VoyagerData['lightTime']>>;
+  trajectory: NonNullable<VoyagerData['trajectory']>;
+  communication?: DsnContact | null;
+  sinceLaunchLabel?: string;
+  distanceSinceLaunchKm?: number | null;
+  milestones?: { label: string; date: string; since: string }[];
+  spark24hPath?: string | null;
+  spark7dPath?: string | null;
+}
+
+const VOYAGER_MISSION = {
+  voyager1: {
+    launch: '1977-09-05T12:56:00Z',
+    events: [
+      { label: 'Jupiter (survol)', date: '1979-03-05T00:00:00Z' },
+      { label: 'Saturne (survol)', date: '1980-11-12T00:00:00Z' },
+      { label: 'Héliopause', date: '2012-08-25T00:00:00Z' }
+    ]
+  },
+  voyager2: {
+    launch: '1977-08-20T14:29:00Z',
+    events: [
+      { label: 'Jupiter (survol)', date: '1979-07-09T00:00:00Z' },
+      { label: 'Saturne (survol)', date: '1981-08-26T00:00:00Z' },
+      { label: 'Uranus (survol)', date: '1986-01-24T00:00:00Z' },
+      { label: 'Neptune (survol)', date: '1989-08-25T00:00:00Z' }
+    ]
+  }
+} as const;
+
+const MS_PER_DAY = 86_400_000;
+const KM_PER_AU = 149_597_870.7;
+const SPEED_OF_LIGHT_KM_S = 299_792.458;
+const VOYAGER_COLORS: Record<VoyagerData['id'], string> = {
+  voyager1: '#7fe3ff',
+  voyager2: '#ffb347'
+};
 
 @Component({
   selector: 'app-solar-system',
@@ -110,11 +169,27 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
   private lastLatencyTimestamp: string | null = null;
   autoRefreshEnabled = true;
   readonly refreshIntervalMs = 60_000;
-  lastCacheStatus: 'HIT' | 'MISS' | 'STALE' | null = null;
+  lastCacheStatus: 'HIT' | 'MISS' | 'STALE' | 'FROZEN' | null = null;
   lastCacheBackend: 'memory' | 'redis' | null = null;
   cacheAgeMs: number | null = null;
   cacheTtlMs: number | null = null;
   currentLatencyMs: number | null = null;
+  frozenSnapshot = false;
+  freezeReason: string | null = null;
+  lastRequestId: string | null = null;
+  lastVoyagerRequestId: string | null = null;
+  lastVoyagerTimestamp: string | null = null;
+  voyagers: VoyagerData[] = [];
+  voyagerViews: VoyagerView[] = [];
+  voyagerError: string | null = null;
+  voyagerLoading = false;
+  voyagerMarkers: VoyagerMarker[] = [];
+  copyStatus: 'idle' | 'success' | 'error' = 'idle';
+  copyMessage: string | null = null;
+  private voyagerSub?: Subscription;
+  dsnContacts: DsnContact[] = [];
+  dsnError: string | null = null;
+  private dsnSub?: Subscription;
 
   /**
    * Abonnement au flux de mise à jour périodique des éphémérides.
@@ -125,6 +200,8 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
   private readonly msPerDay = 86_400_000;
   private latencySumMs = 0;
   private latencyCount = 0;
+  private lastPanX = 0;
+  private lastPanY = 0;
 
   /**
    * Indicateur de chargement (optionnel, au cas où tu veux l’exploiter dans le template).
@@ -143,7 +220,9 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
 
   constructor(
     private planetService: PlanetService,
-    private ephemerisService: RealEphemerisService
+    private ephemerisService: RealEphemerisService,
+    private voyagerService: VoyagerService,
+    private dsnService: DsnService
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -165,11 +244,15 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
     this.oneAuPixels = this.distanceToPixels(1);
 
     this.startAutoRefresh();
+    this.startVoyagerAutoRefresh();
+    this.startDsnAutoRefresh();
   }
 
   ngOnDestroy(): void {
     this.stopAutoRefresh();
     this.stopInertialAnimation();
+    this.stopVoyagerAutoRefresh();
+    this.stopDsnAutoRefresh();
   }
 
   // ---------------------------------------------------------------------------
@@ -191,16 +274,44 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
     this.snapshotReceivedAt = Date.now();
     this.metadata = snapshot.metadata ?? null;
     this.lastUpdateTimestamp = snapshot.timestamp || new Date().toISOString();
+    this.frozenSnapshot = !!snapshot.metadata?.frozenSnapshot;
+    this.freezeReason = snapshot.metadata?.freezeReason ?? null;
+    this.lastRequestId = snapshot.metadata?.requestId ?? null;
     this.trackLatency(snapshot);
     this.trackCache(snapshot);
     this.updateDisplayFromSnapshot(snapshot);
     this.startInertialAnimation();
+    this.enrichVoyagerViews();
   }
 
   private handleSnapshotError(err: unknown): void {
     console.error('Erreur éphémérides:', err);
     this.errorMessage =
       'Erreur lors de la récupération des positions réelles des planètes.';
+    if (this.lastSnapshot) {
+      this.frozenSnapshot = true;
+      this.freezeReason = 'Dernière réponse Horizons indisponible. Données précédentes affichées.';
+    }
+  }
+
+  private fetchVoyagers(): Observable<VoyagerSnapshot> {
+    this.voyagerLoading = true;
+    this.voyagerError = null;
+    return this.voyagerService.getVoyagers().pipe(finalize(() => (this.voyagerLoading = false)));
+  }
+
+  private handleVoyagers(snapshot: VoyagerSnapshot): void {
+    this.voyagerError = null;
+    this.voyagers = snapshot.voyagers ?? [];
+    this.lastVoyagerRequestId = snapshot.requestId ?? this.lastVoyagerRequestId;
+    this.lastRequestId = snapshot.requestId ?? this.lastRequestId;
+    this.lastVoyagerTimestamp = snapshot.timestamp ?? this.lastVoyagerTimestamp;
+    this.enrichVoyagerViews();
+  }
+
+  private handleVoyagerError(err: unknown): void {
+    console.error('Erreur Voyager:', err);
+    this.voyagerError = 'Impossible de récupérer les données Voyager pour le moment.';
   }
 
   private startAutoRefresh(): void {
@@ -223,6 +334,49 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
     this.ephemerisSub = undefined;
   }
 
+  private startVoyagerAutoRefresh(): void {
+    this.stopVoyagerAutoRefresh();
+    this.voyagerSub = interval(this.refreshIntervalMs * 5)
+      .pipe(
+        startWith(0),
+        switchMap(() => this.fetchVoyagers())
+      )
+      .subscribe({
+        next: (snapshot) => this.handleVoyagers(snapshot),
+        error: (err) => this.handleVoyagerError(err)
+      });
+  }
+
+  private stopVoyagerAutoRefresh(): void {
+    this.voyagerSub?.unsubscribe();
+    this.voyagerSub = undefined;
+  }
+
+  private startDsnAutoRefresh(): void {
+    this.stopDsnAutoRefresh();
+    this.dsnSub = interval(this.refreshIntervalMs * 5)
+      .pipe(
+        startWith(0),
+        switchMap(() => this.dsnService.getContacts())
+      )
+      .subscribe({
+        next: (contacts) => {
+          this.dsnError = null;
+          this.dsnContacts = contacts;
+          this.enrichVoyagerViews();
+        },
+        error: (err) => {
+          console.error('Erreur DSN:', err);
+          this.dsnError = 'Statut DSN indisponible pour le moment.';
+        }
+      });
+  }
+
+  private stopDsnAutoRefresh(): void {
+    this.dsnSub?.unsubscribe();
+    this.dsnSub = undefined;
+  }
+
   toggleAutoRefresh(): void {
     if (this.autoRefreshEnabled) {
       this.autoRefreshEnabled = false;
@@ -236,6 +390,24 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
     this.fetchSnapshot({ forceRefresh: forceNetwork }).subscribe({
       next: (snapshot) => this.handleSnapshot(snapshot),
       error: (err) => this.handleSnapshotError(err)
+    });
+
+    // Rafraîchit aussi les données Voyager pour garder la cohérence temporelle
+    this.fetchVoyagers().subscribe({
+      next: (snapshot) => this.handleVoyagers(snapshot),
+      error: (err) => this.handleVoyagerError(err)
+    });
+
+    this.dsnService.getContacts().subscribe({
+      next: (contacts) => {
+        this.dsnContacts = contacts;
+        this.dsnError = null;
+        this.enrichVoyagerViews();
+      },
+      error: (err) => {
+        console.error('Erreur DSN:', err);
+        this.dsnError = 'Statut DSN indisponible pour le moment.';
+      }
     });
   }
 
@@ -367,6 +539,7 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
   private updateDisplayFromSnapshot(snapshot: EphemerisSnapshot): void {
     if (!snapshot || !snapshot.bodies || snapshot.bodies.length === 0) {
       this.displayPlanets = [];
+      this.voyagerMarkers = [];
       return;
     }
 
@@ -375,7 +548,7 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
       positionsByName.set(body.name, body);
     }
 
-    const display: DisplayPlanet[] = [];
+    let display: DisplayPlanet[] = [];
     const deltaDays = this.timeOffsetDays + this.computeDriftDays(snapshot);
 
     for (const planet of this.planets) {
@@ -471,14 +644,17 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
     // Optionnel : recalcule l'échelle 1 UA (utile après focus)
     this.oneAuPixels = this.distanceToPixels(1);
 
+    let panX = 0;
+    let panY = 0;
+
     // Si on doit centrer sur une planète, calcule un décalage global
     if (this.focusPlanetName) {
       const focused = display.find(dp => dp.planet.name === this.focusPlanetName);
       if (focused) {
-        const panX = this.centerX - focused.x;
-        const panY = this.centerY - focused.y;
+        panX = this.centerX - focused.x;
+        panY = this.centerY - focused.y;
 
-        this.displayPlanets = display.map(dp => ({
+        display = display.map(dp => ({
           ...dp,
           x: dp.x + panX,
           y: dp.y + panY,
@@ -498,11 +674,13 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
               }
             : undefined
         }));
-        return;
       }
     }
 
     this.displayPlanets = display;
+    this.lastPanX = panX;
+    this.lastPanY = panY;
+    this.voyagerMarkers = this.buildVoyagerMarkers(deltaDays, panX, panY);
   }
 
   /**
@@ -632,6 +810,18 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
     if (meta.responseTimeMs !== undefined && Number.isFinite(meta.responseTimeMs)) {
       this.currentLatencyMs = meta.responseTimeMs;
     }
+
+    if (meta.frozenSnapshot) {
+      this.frozenSnapshot = true;
+      this.freezeReason = meta.freezeReason ?? this.freezeReason;
+    } else {
+      this.frozenSnapshot = false;
+      this.freezeReason = null;
+    }
+
+    if (meta.requestId) {
+      this.lastRequestId = meta.requestId;
+    }
   }
 
   private computeDriftDays(snapshot: EphemerisSnapshot): number {
@@ -647,6 +837,339 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
 
     const driftMs = now - referenceMs;
     return Math.max(0, driftMs) / this.msPerDay;
+  }
+
+  private enrichVoyagerViews(): void {
+    const earth = this.lastSnapshot?.bodies?.find((b) => b.name === 'earth');
+    this.voyagerViews = (this.voyagers ?? []).map((v) => this.buildVoyagerView(v, earth));
+    this.refreshVoyagerMarkers();
+  }
+
+  private buildVoyagerView(v: VoyagerData, earth?: PlanetPosition): VoyagerView {
+    const earthDistanceKm = this.computeEarthDistanceKm(v, earth);
+    const distanceFromEarth = {
+      au: earthDistanceKm !== null ? earthDistanceKm / KM_PER_AU : v.distanceFromEarth?.au ?? null,
+      km: earthDistanceKm ?? v.distanceFromEarth?.km ?? null,
+      miles: earthDistanceKm !== null ? earthDistanceKm * 0.621371 : v.distanceFromEarth?.miles ?? null,
+      lightTimeMin:
+        earthDistanceKm !== null ? earthDistanceKm / SPEED_OF_LIGHT_KM_S / 60 : v.lightTime?.oneWayMinutes ?? null,
+      lightTimeHours:
+        earthDistanceKm !== null ? earthDistanceKm / SPEED_OF_LIGHT_KM_S / 3600 : null
+    };
+
+    const lightTime = this.computeLightTime(v, earthDistanceKm);
+    const trajectory = v.trajectory ?? this.computeTrajectoryFromVector(v);
+    const communication = this.findDsnContact(v);
+    const mission = VOYAGER_MISSION[v.id];
+    const milestones = this.buildMilestones(mission?.events ?? []);
+    const sinceLaunchLabel = mission ? this.formatDurationSince(mission.launch) : undefined;
+    const distanceSinceLaunchKm = earthDistanceKm ?? v.distanceFromEarth?.km ?? v.distanceFromSun.km ?? null;
+
+    const distanceForTrend = distanceFromEarth.km ?? v.distanceFromSun.km ?? null;
+    const speedKmS = v.speed.kmPerS ?? null;
+    const spark24hPath = this.buildSparklinePath(distanceForTrend, speedKmS, 24);
+    const spark7dPath = this.buildSparklinePath(distanceForTrend, speedKmS, 24 * 7);
+
+    return {
+      ...v,
+      distanceFromEarth,
+      lightTime,
+      trajectory,
+      communication,
+      sinceLaunchLabel,
+      distanceSinceLaunchKm,
+      milestones,
+      spark24hPath,
+      spark7dPath
+    };
+  }
+
+  private computeEarthDistanceKm(v: VoyagerData, earth?: PlanetPosition): number | null {
+    if (v.distanceFromEarth?.km !== undefined && v.distanceFromEarth?.km !== null) {
+      return v.distanceFromEarth.km;
+    }
+    if (!earth || !Number.isFinite(earth.x_au) || !Number.isFinite(earth.y_au) || !Number.isFinite(earth.z_au)) {
+      return null;
+    }
+    const distAu = Math.sqrt(
+      Math.pow((v.positionAu?.x ?? 0) - earth.x_au, 2) +
+        Math.pow((v.positionAu?.y ?? 0) - earth.y_au, 2) +
+        Math.pow((v.positionAu?.z ?? 0) - earth.z_au, 2)
+    );
+    return distAu * KM_PER_AU;
+  }
+
+  private computeLightTime(v: VoyagerData, earthDistanceKm: number | null): Required<NonNullable<VoyagerData['lightTime']>> {
+    if (v.lightTime?.oneWaySeconds !== undefined && v.lightTime.oneWaySeconds !== null) {
+      return {
+        oneWaySeconds: v.lightTime.oneWaySeconds,
+        oneWayMinutes: v.lightTime.oneWayMinutes ?? v.lightTime.oneWaySeconds / 60,
+        twoWayMinutes: v.lightTime.twoWayMinutes ?? (v.lightTime.oneWaySeconds * 2) / 60
+      };
+    }
+    if (earthDistanceKm === null) {
+      return { oneWaySeconds: null, oneWayMinutes: null, twoWayMinutes: null };
+    }
+    const oneWaySeconds = earthDistanceKm / SPEED_OF_LIGHT_KM_S;
+    return {
+      oneWaySeconds,
+      oneWayMinutes: oneWaySeconds / 60,
+      twoWayMinutes: (oneWaySeconds * 2) / 60
+    };
+  }
+
+  private computeTrajectoryFromVector(v: VoyagerData): NonNullable<VoyagerData['trajectory']> {
+    const r = Math.sqrt(
+      (v.positionAu?.x ?? 0) * (v.positionAu?.x ?? 0) +
+        (v.positionAu?.y ?? 0) * (v.positionAu?.y ?? 0) +
+        (v.positionAu?.z ?? 0) * (v.positionAu?.z ?? 0)
+    );
+    const eclipticLatDeg = r ? (Math.asin((v.positionAu?.z ?? 0) / r) * 180) / Math.PI : null;
+    const eclipticLonDeg = r ? this.normalizeAngleDeg((Math.atan2(v.positionAu?.y ?? 0, v.positionAu?.x ?? 0) * 180) / Math.PI) : null;
+    const speed = Math.sqrt(
+      (v.velocityAuPerDay?.x ?? 0) * (v.velocityAuPerDay?.x ?? 0) +
+        (v.velocityAuPerDay?.y ?? 0) * (v.velocityAuPerDay?.y ?? 0) +
+        (v.velocityAuPerDay?.z ?? 0) * (v.velocityAuPerDay?.z ?? 0)
+    );
+    const velocityLatDeg =
+      speed > 0 && v.velocityAuPerDay?.z !== undefined
+        ? (Math.asin(v.velocityAuPerDay.z / speed) * 180) / Math.PI
+        : null;
+    const velocityAzimuthDeg =
+      speed > 0 && v.velocityAuPerDay?.x !== undefined && v.velocityAuPerDay?.y !== undefined
+        ? this.normalizeAngleDeg((Math.atan2(v.velocityAuPerDay.y, v.velocityAuPerDay.x) * 180) / Math.PI)
+        : null;
+
+    return { eclipticLatDeg, eclipticLonDeg, velocityAzimuthDeg, velocityLatDeg };
+  }
+
+  private refreshVoyagerMarkers(): void {
+    if (!this.lastSnapshot) {
+      this.voyagerMarkers = [];
+      return;
+    }
+    const deltaDays = this.timeOffsetDays + this.computeDriftDays(this.lastSnapshot);
+    this.voyagerMarkers = this.buildVoyagerMarkers(deltaDays, this.lastPanX, this.lastPanY);
+  }
+
+  private getVelocityComponent(vec: VoyagerData['velocityAuPerDay'] | undefined, key: 'x' | 'y' | 'z'): number | null {
+    if (!vec) {
+      return null;
+    }
+    const altKey = key === 'x' ? 'vx' : key === 'y' ? 'vy' : 'vz';
+    const value = (vec as any)[key] ?? (vec as any)[altKey];
+    return Number.isFinite(value) ? Number(value) : null;
+  }
+
+  private computeVoyagerPosition(v: VoyagerData, deltaDays: number): { x: number; y: number; z: number } {
+    const base = {
+      x: v.positionAu?.x ?? 0,
+      y: v.positionAu?.y ?? 0,
+      z: v.positionAu?.z ?? 0
+    };
+
+    if (!this.enableInertialPlayback) {
+      return base;
+    }
+
+    const vx = this.getVelocityComponent(v.velocityAuPerDay, 'x') ?? 0;
+    const vy = this.getVelocityComponent(v.velocityAuPerDay, 'y') ?? 0;
+    const vz = this.getVelocityComponent(v.velocityAuPerDay, 'z') ?? 0;
+
+    return {
+      x: base.x + vx * deltaDays,
+      y: base.y + vy * deltaDays,
+      z: base.z + vz * deltaDays
+    };
+  }
+
+  private findDsnContact(v: VoyagerData): DsnContact | null {
+    const match = this.dsnContacts.find(
+      (c) =>
+        c.spacecraft.toUpperCase().includes(v.id === 'voyager1' ? 'VGR1' : 'VGR2') ||
+        c.spacecraftId === (v.id === 'voyager1' ? '31' : '32')
+    );
+    return match ?? null;
+  }
+
+  private buildMilestones(events: ReadonlyArray<{ label: string; date: string }>): { label: string; date: string; since: string }[] {
+    return events.map((e) => ({
+      ...e,
+      since: this.formatDurationSince(e.date)
+    }));
+  }
+
+  private formatDurationSince(dateIso: string): string {
+    const ts = Date.parse(dateIso);
+    if (!Number.isFinite(ts)) {
+      return '';
+    }
+    const diffMs = Date.now() - ts;
+    const years = Math.floor(diffMs / (MS_PER_DAY * 365.25));
+    const days = Math.floor((diffMs - years * MS_PER_DAY * 365.25) / MS_PER_DAY);
+    if (years > 0) {
+      return `${years} an${years > 1 ? 's' : ''}${days > 0 ? ` ${days} j` : ''}`;
+    }
+    const hours = Math.floor((diffMs - days * MS_PER_DAY) / 3_600_000);
+    if (days > 0) {
+      return `${days} j ${hours} h`;
+    }
+    const minutes = Math.floor((diffMs - hours * 3_600_000) / 60_000);
+    return `${hours} h ${minutes} min`;
+  }
+
+  private buildSparklinePath(distanceKm: number | null, speedKmS: number | null, horizonHours: number): string | null {
+    if (distanceKm === null || speedKmS === null) {
+      return null;
+    }
+    const points: { x: number; y: number }[] = [];
+    const steps = 12;
+    const horizonSeconds = horizonHours * 3600;
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const secondsAgo = horizonSeconds * t;
+      const projected = distanceKm - speedKmS * secondsAgo;
+      points.push({ x: (1 - t) * 100, y: projected });
+    }
+
+    const min = Math.min(...points.map((p) => p.y));
+    const max = Math.max(...points.map((p) => p.y));
+    const span = max - min || 1;
+    const height = 30;
+
+    const normalized = points.map((p) => ({
+      x: p.x,
+      y: height - ((p.y - min) / span) * height
+    }));
+
+    return normalized
+      .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+      .join(' ');
+  }
+
+  private buildVoyagerMarkers(deltaDays: number, panX = 0, panY = 0): VoyagerMarker[] {
+    if (!this.voyagers?.length) {
+      return [];
+    }
+
+    const maxRadius = Math.min(this.width, this.height) / 2 - 12;
+
+    return this.voyagers
+      .map((v) => {
+        const pos = this.computeVoyagerPosition(v, deltaDays);
+        const rAu = Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z) || 0;
+        const rPxRaw = rAu ? this.distanceToPixels(rAu) : 0;
+        const rPx = Math.min(rPxRaw, maxRadius);
+        const scale = rAu ? rPx / rAu : 0;
+
+        let x: number;
+        let y: number;
+
+        if (this.viewMode === '3d') {
+          const projected = this.project3dPoint(pos.x, pos.y, pos.z, scale);
+          x = projected.x;
+          y = projected.y;
+        } else {
+          x = this.centerX + pos.x * scale;
+          y = this.centerY + pos.y * scale;
+        }
+
+        return {
+          id: v.id,
+          name: v.name,
+          x: x + panX,
+          y: y + panY,
+          rAu,
+          distanceLabel: rAu ? `${rAu.toFixed(1)} UA` : '',
+          color: VOYAGER_COLORS[v.id]
+        };
+      })
+      .filter((m) => Number.isFinite(m.x) && Number.isFinite(m.y));
+  }
+
+  copyVoyagerSnapshotAsJson(): void {
+    try {
+      const payload = {
+        timestamp: this.lastVoyagerTimestamp ?? new Date().toISOString(),
+        requestId: this.lastVoyagerRequestId,
+        voyagers: this.voyagerViews
+      };
+      const text = JSON.stringify(payload, null, 2);
+      this.copyText(text, 'Snapshot copié (JSON)');
+    } catch (err) {
+      console.error('copy json failed', err);
+      this.copyStatus = 'error';
+      this.copyMessage = 'Échec de la copie JSON';
+    }
+  }
+
+  exportVoyagerCsv(): void {
+    if (!this.voyagerViews.length) {
+      this.copyStatus = 'error';
+      this.copyMessage = 'Aucune donnée Voyager à exporter';
+      return;
+    }
+    const header = [
+      'name',
+      'id',
+      'timestamp',
+      'distanceSunKm',
+      'distanceEarthKm',
+      'speedKmS',
+      'eclipticLatDeg',
+      'eclipticLonDeg'
+    ];
+    const rows = this.voyagerViews.map((v) => [
+      v.name,
+      v.id,
+      v.timestamp,
+      v.distanceFromSun.km ?? '',
+      v.distanceFromEarth.km ?? '',
+      v.speed.kmPerS ?? '',
+      v.trajectory.eclipticLatDeg ?? '',
+      v.trajectory.eclipticLonDeg ?? ''
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    this.copyText(csv, 'Export CSV copié dans le presse-papiers');
+  }
+
+  private copyText(text: string, successMsg: string): void {
+    const done = () => {
+      this.copyStatus = 'success';
+      this.copyMessage = successMsg;
+      setTimeout(() => (this.copyStatus = 'idle'), 2000);
+    };
+
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch((err) => {
+        console.error('clipboard error', err);
+        this.copyStatus = 'error';
+        this.copyMessage = 'Impossible de copier dans le presse-papiers';
+      });
+    } else {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        done();
+      } catch (err) {
+        console.error('copy fallback failed', err);
+        this.copyStatus = 'error';
+        this.copyMessage = 'Impossible de copier le texte';
+      }
+    }
+  }
+
+  private normalizeAngleDeg(deg: number): number {
+    const wrapped = deg % 360;
+    return wrapped < 0 ? wrapped + 360 : wrapped;
   }
 
   private hasVelocity(pos: PlanetPosition): pos is PlanetPosition & Required<Pick<PlanetPosition, 'vx' | 'vy' | 'vz'>> {
@@ -724,6 +1247,33 @@ export class SolarSystemComponent implements OnInit, OnDestroy {
 
     // Nettoie le flag de sélection visuelle
     this.updateSelectionFlags(null);
+  }
+
+  get voyagerSourceBadge(): string | null {
+    if (!this.lastVoyagerTimestamp && !this.lastVoyagerRequestId) {
+      return null;
+    }
+    const freshness = this.lastVoyagerTimestamp ? this.freshnessFrom(this.lastVoyagerTimestamp) : null;
+    const req = this.lastVoyagerRequestId ? `req #${this.lastVoyagerRequestId}` : null;
+    const parts = ['Horizons', freshness ? `mis à jour ${freshness}` : null, req].filter(Boolean);
+    return parts.join(' • ');
+  }
+
+  private freshnessFrom(timestamp: string): string | null {
+    const ts = Date.parse(timestamp);
+    if (!Number.isFinite(ts)) {
+      return null;
+    }
+    const diffMs = Date.now() - ts;
+    if (diffMs < 0) {
+      return 'à l’instant';
+    }
+    const diffMin = diffMs / 60000;
+    if (diffMin < 1) return 'il y a < 1 min';
+    if (diffMin < 60) return `il y a ${Math.round(diffMin)} min`;
+    const diffH = diffMin / 60;
+    if (diffH < 24) return `il y a ${diffH.toFixed(1)} h`;
+    return `il y a ${(diffH / 24).toFixed(1)} j`;
   }
 
   /**

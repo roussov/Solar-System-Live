@@ -36,6 +36,9 @@ export interface EphemerisSnapshot {
     cacheExpiresInMs?: number;
     cacheStale?: boolean;
     generatedAt?: string;
+    frozenSnapshot?: boolean;
+    freezeReason?: string;
+    requestId?: string;
   };
   bodies: EphemerisBody[];
 }
@@ -49,7 +52,7 @@ interface CacheRecord {
 
 export interface SnapshotResult {
   payload: EphemerisSnapshot;
-  cacheState: 'HIT' | 'MISS' | 'STALE';
+  cacheState: 'HIT' | 'MISS' | 'STALE' | 'FROZEN';
   cacheBackend: CacheBackend;
   cacheAgeMs: number;
 }
@@ -138,10 +141,10 @@ async function writeCache(record: CacheRecord, backend: CacheBackend): Promise<v
   }
 }
 
-async function buildPlanetSnapshot(): Promise<EphemerisSnapshot> {
+async function buildPlanetSnapshot(correlationId?: string): Promise<EphemerisSnapshot> {
   const started = Date.now();
   const results = await Promise.all(
-    PLANETS.map((cfg) => fetchPlanetStateVector(cfg.horizonsId, cfg.name))
+    PLANETS.map((cfg) => fetchPlanetStateVector(cfg.horizonsId, cfg.name, { correlationId }))
   );
   const latencyMs = Date.now() - started;
 
@@ -171,9 +174,9 @@ async function buildPlanetSnapshot(): Promise<EphemerisSnapshot> {
   };
 }
 
-async function refreshSnapshot(reason: string): Promise<SnapshotResult> {
+async function refreshSnapshot(reason: string, correlationId?: string): Promise<SnapshotResult> {
   const backend: CacheBackend = (await getRedisClient()) ? 'redis' : 'memory';
-  const payload = await buildPlanetSnapshot();
+  const payload = await buildPlanetSnapshot(correlationId);
   const now = Date.now();
 
   const record: CacheRecord = {
@@ -195,13 +198,15 @@ async function refreshSnapshot(reason: string): Promise<SnapshotResult> {
     cacheAgeMs,
     cacheExpiresInMs: CACHE_TTL_MS,
     cacheStale: false,
-    generatedAt: new Date(now).toISOString()
+    generatedAt: new Date(now).toISOString(),
+    requestId: correlationId
   };
 
   logInfo('ephemeris_refresh', {
     backend,
     reason,
-    responseTimeMs: payload.metadata.responseTimeMs
+    responseTimeMs: payload.metadata.responseTimeMs,
+    requestId: correlationId
   });
 
   return {
@@ -216,7 +221,8 @@ function decoratePayloadMetadata(
   payload: EphemerisSnapshot,
   cacheState: SnapshotResult['cacheState'],
   backend: CacheBackend,
-  cacheAgeMs: number
+  cacheAgeMs: number,
+  correlationId?: string
 ): EphemerisSnapshot {
   const baseMetadata = payload.metadata ?? {};
 
@@ -229,6 +235,7 @@ function decoratePayloadMetadata(
       cacheAgeMs,
       cacheExpiresInMs: Math.max(0, CACHE_TTL_MS - cacheAgeMs),
       cacheStale: cacheState === 'STALE',
+      requestId: correlationId ?? baseMetadata.requestId,
       generatedAt:
         baseMetadata.generatedAt ?? new Date(Date.now() - cacheAgeMs).toISOString()
     }
@@ -237,6 +244,7 @@ function decoratePayloadMetadata(
 
 export async function getSnapshot(options?: {
   forceRefresh?: boolean;
+  correlationId?: string;
 }): Promise<SnapshotResult> {
   const backend: CacheBackend = (await getRedisClient()) ? 'redis' : 'memory';
   const now = Date.now();
@@ -264,7 +272,8 @@ export async function getSnapshot(options?: {
             cached.payload,
             cacheState,
             backend,
-            cacheAgeMs
+            cacheAgeMs,
+            options?.correlationId
           ),
           cacheState,
           cacheBackend: backend,
@@ -275,11 +284,69 @@ export async function getSnapshot(options?: {
   }
 
   if (!inflightPromise) {
-    inflightPromise = refreshSnapshot(options?.forceRefresh ? 'manual-refresh' : 'miss');
+    inflightPromise = refreshSnapshot(
+      options?.forceRefresh ? 'manual-refresh' : 'miss',
+      options?.correlationId
+    );
   }
 
   try {
-    return await inflightPromise;
+    const result = await inflightPromise;
+    const payload = decoratePayloadMetadata(
+      result.payload,
+      result.cacheState,
+      result.cacheBackend,
+      result.cacheAgeMs,
+      options?.correlationId ?? result.payload?.metadata?.requestId
+    );
+
+    return {
+      ...result,
+      payload
+    };
+  } catch (err: any) {
+    const cached = memoryCache ?? (await readCache());
+    if (cached) {
+      const cacheAgeMs = now - cached.cachedAt;
+      const payload = decoratePayloadMetadata(
+        cached.payload,
+        'FROZEN',
+        backend,
+        cacheAgeMs,
+        options?.correlationId
+      );
+
+      payload.metadata = {
+        ...payload.metadata,
+        cacheStale: true,
+        cacheExpiresInMs: 0,
+        frozenSnapshot: true,
+        freezeReason: err?.message ?? 'Erreur inconnue lors du fetch Horizons',
+        requestId: options?.correlationId
+      };
+
+      logWarn('ephemeris_snapshot_frozen', {
+        backend,
+        cacheAgeMs,
+        requestId: options?.correlationId,
+        error: err?.message ?? String(err)
+      });
+
+      return {
+        payload,
+        cacheState: 'FROZEN',
+        cacheBackend: backend,
+        cacheAgeMs
+      };
+    }
+
+    logError('ephemeris_refresh_failed', {
+      backend,
+      requestId: options?.correlationId,
+      error: err?.message ?? String(err)
+    });
+
+    throw err;
   } finally {
     inflightPromise = null;
   }

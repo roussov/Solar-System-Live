@@ -203,12 +203,15 @@ export interface EphemerisSnapshot {
     distanceUnit?: string;
     velocityUnit?: string;
     responseTimeMs?: number;
-    cacheStatus?: 'HIT' | 'MISS' | 'STALE';
+    cacheStatus?: 'HIT' | 'MISS' | 'STALE' | 'FROZEN';
     cacheBackend?: 'memory' | 'redis';
     cacheAgeMs?: number;
     cacheExpiresInMs?: number;
     cacheStale?: boolean;
     generatedAt?: string;
+    frozenSnapshot?: boolean;
+    freezeReason?: string;
+    requestId?: string;
   };
 
   // ---------------------------------------------------------------------------

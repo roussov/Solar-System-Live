@@ -16,18 +16,25 @@ du système solaire (Pluton incluse) autour du Soleil, en se basant sur des éph
 - npm ou pnpm
 - Accès Internet pour interroger `https://ssd-api.jpl.nasa.gov/horizons.api`
 
-## Installation
+## Développement
+
+- `npm run dev` (à la racine) : démarre l’API sur `http://localhost:3000` et le frontend sur `http://localhost:4200`.
+- L’UI interroge l’API sur `http://localhost:3000/api/ephemeris/planets` (configurable dans `client/src/environments/environment.ts`).
+
+## Installation / lancement rapide
 
 ```bash
-# Backend
-cd server
-npm install
-npm run dev     # démarre l’API sur http://localhost:3000
+# À la racine (commande unique)
+npm run dev     # démarre l’API (server) + le client Angular (client)
 
-# Frontend
-cd ../client
-npm install
-npm start       # démarre l’app Angular sur http://localhost:4200
+# Installation séparée (si besoin)
+cd server && npm install   # dépendances backend
+cd ../client && npm install # dépendances frontend
+
+## Build
+
+- `npm run build` (à la racine) : build backend (`server`) puis frontend (`client/dist/solar-system-real-client`).
+- Pour le déploiement Netlify, le dossier de publication est `client/dist/solar-system-real-client` (voir `netlify.toml`).
 ```
 
 Le frontend est configuré pour appeler l’API backend à l’URL

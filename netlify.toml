@@ -1,6 +1,17 @@
 [build]
-  # Run the frontend build from the repo root so Netlify doesn’t look for a package.json at the top level.
-  command = "npm --prefix client install && npm --prefix client run build"
+  # Build from the client directory so Netlify uses the existing lockfile.
+  base = "client"
+  command = "npm ci && npm run build -- --configuration=production"
+  publish = "dist/solar-system-real-client"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[dev]
+  # Pour `netlify dev`: on utilise la commande racine qui lance API + client.
+  command = "npm run dev"
+  targetPort = 4200
+  framework = "#custom"
   publish = "client/dist/solar-system-real-client"
 
 [[redirects]]

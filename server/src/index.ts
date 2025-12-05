@@ -6,14 +6,18 @@ import {
   metricsContentType
 } from './observability/metrics';
 import { logInfo } from './observability/logger';
+import { applyRequestTracing } from './observability/requestTracing';
+import voyagersRouter from './routes/voyagers';
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(applyRequestTracing());
 app.use(cors());
 app.use(express.json());
 
 app.use('/api/ephemeris', ephemerisRouter);
+app.use('/api/voyagers', voyagersRouter);
 
 app.get('/', (_req, res) => {
   res.send('Solar System Real – API JPL Horizons');

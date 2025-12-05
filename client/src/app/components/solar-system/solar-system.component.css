@@ -84,6 +84,300 @@
   gap: 10px;
 }
 
+.status-banner {
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-soft);
+  line-height: 1.35;
+}
+
+.status-banner .status-title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.status-banner.frozen {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0.06));
+}
+
+.status-banner.error {
+  border-color: rgba(255, 99, 99, 0.35);
+  background: linear-gradient(135deg, rgba(255, 99, 99, 0.16), rgba(255, 99, 99, 0.06));
+}
+
+.voyager-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow-soft);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.panel-subtitle {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.voyager-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.voyager-card {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.voyager-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.voyager-name {
+  font-weight: 700;
+}
+
+.voyager-id {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.voyager-meta {
+  color: var(--text-soft);
+  font-size: 12px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.voyager-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.voyager-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.voyager-row .label {
+  color: var(--text-soft);
+  font-size: 12px;
+  min-width: 120px;
+}
+
+.voyager-row .value {
+  font-weight: 600;
+}
+
+.voyager-row .value.mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+}
+
+.voyager-row .value .muted {
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chip.subtle {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.since-launch {
+  color: var(--text-soft);
+  font-size: 12px;
+  text-align: right;
+}
+
+.trajectory span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.comm-row .value {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comm-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.sparkline-block {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.sparkline {
+  flex: 1 1 0;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+}
+
+.spark-label {
+  font-size: 12px;
+  color: var(--text-soft);
+  margin-bottom: 4px;
+}
+
+.sparkline svg {
+  width: 100%;
+  height: 32px;
+}
+
+.sparkline path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.voyager-milestones {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.milestone-title {
+  font-size: 12px;
+  color: var(--text-soft);
+  margin-bottom: 4px;
+}
+
+.milestone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.milestone-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.milestone-item .dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.milestone-item .since {
+  color: var(--text-soft);
+  margin-left: auto;
+}
+
+.badge {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.voyager-compare {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.compare-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.compare-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+.compare-row {
+  display: contents;
+}
+
+.compare-row .cell {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.compare-row.head .cell {
+  font-weight: 700;
+  color: var(--text-soft);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.compare-row .cell.label {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
 /* Colonne droite : panneau d’info */
 .right-pane {
   flex: 0 0 auto;
@@ -561,6 +855,30 @@
   stroke-width: 1.5;
   stroke-linecap: round;
   opacity: 0.9;
+}
+
+.voyagers {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.voyager-marker text {
+  pointer-events: none;
+}
+
+.voyager-node {
+  stroke: #0a0a0a;
+  stroke-width: 1;
+}
+
+.voyager-label {
+  fill: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.voyager-distance {
+  fill: var(--text-soft);
+  font-size: 10px;
 }
 
 /* ------------------------------------------------------------------------- */

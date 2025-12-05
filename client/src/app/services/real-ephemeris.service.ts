@@ -11,11 +11,23 @@ export class RealEphemerisService {
 
   constructor(private http: HttpClient) {}
 
+  private generateRequestId(): string {
+    const globalCrypto = (globalThis as any)?.crypto;
+    if (globalCrypto?.randomUUID) {
+      return globalCrypto.randomUUID();
+    }
+
+    return 'req-' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+
   getCurrentPlanetPositions(options?: { forceRefresh?: boolean }): Observable<EphemerisSnapshot> {
+    const requestId = this.generateRequestId();
+
     return this.http
       .get<EphemerisSnapshot>(`${this.baseUrl}/planets`, {
         observe: 'response',
-        params: options?.forceRefresh ? { refresh: '1' } : undefined
+        params: options?.forceRefresh ? { refresh: '1' } : undefined,
+        headers: { 'X-Request-Id': requestId }
       })
       .pipe(
         map((response) => {
@@ -30,6 +42,8 @@ export class RealEphemerisService {
           const cacheAgeHeader = Number.parseInt(headers.get('X-Horizons-Cache-Age') || '', 10);
           const ttlHeader = Number.parseInt(headers.get('X-Horizons-TTL') || '', 10);
           const latencyHeader = Number.parseInt(headers.get('X-Horizons-Latency') || '', 10);
+          const frozenHeader = headers.get('X-Horizons-Frozen') === '1';
+          const requestId = headers.get('X-Request-Id') ?? body?.metadata?.requestId;
 
           const safeCacheAge = Number.isFinite(cacheAgeHeader)
             ? cacheAgeHeader
@@ -46,13 +60,15 @@ export class RealEphemerisService {
                 cacheStatus: cacheStatus as EphemerisSnapshot['metadata']['cacheStatus'],
                 cacheBackend,
                 cacheAgeMs: safeCacheAge,
-                cacheExpiresInMs: Number.isFinite(ttlHeader)
-                  ? Math.max(0, ttlHeader - (safeCacheAge || 0))
-                  : undefined,
-                responseTimeMs: safeLatency
-              }
-            };
-          }
+              cacheExpiresInMs: Number.isFinite(ttlHeader)
+                ? Math.max(0, ttlHeader - (safeCacheAge || 0))
+                : undefined,
+              responseTimeMs: safeLatency,
+              frozenSnapshot: frozenHeader,
+              requestId
+            }
+          };
+        }
 
           return {
             ...body,
@@ -64,7 +80,10 @@ export class RealEphemerisService {
               cacheExpiresInMs: Number.isFinite(ttlHeader)
                 ? Math.max(0, ttlHeader - (safeCacheAge || 0))
                 : body.metadata?.cacheExpiresInMs,
-              responseTimeMs: safeLatency ?? body.metadata?.responseTimeMs
+              responseTimeMs: safeLatency ?? body.metadata?.responseTimeMs,
+              frozenSnapshot: frozenHeader || body.metadata?.frozenSnapshot,
+              freezeReason: body.metadata?.freezeReason,
+              requestId
             }
           };
         })

@@ -75,9 +75,9 @@ async function writeCache(record, backend) {
         }
     }
 }
-async function buildPlanetSnapshot() {
+async function buildPlanetSnapshot(correlationId) {
     const started = Date.now();
-    const results = await Promise.all(planets_1.PLANETS.map((cfg) => (0, horizonsClient_1.fetchPlanetStateVector)(cfg.horizonsId, cfg.name)));
+    const results = await Promise.all(planets_1.PLANETS.map((cfg) => (0, horizonsClient_1.fetchPlanetStateVector)(cfg.horizonsId, cfg.name, { correlationId })));
     const latencyMs = Date.now() - started;
     (0, metrics_1.recordHorizonsLatency)(latencyMs);
     const timestamp = results[0]?.timestamp ?? new Date().toISOString();
@@ -102,9 +102,9 @@ async function buildPlanetSnapshot() {
         }))
     };
 }
-async function refreshSnapshot(reason) {
+async function refreshSnapshot(reason, correlationId) {
     const backend = (await getRedisClient()) ? 'redis' : 'memory';
-    const payload = await buildPlanetSnapshot();
+    const payload = await buildPlanetSnapshot(correlationId);
     const now = Date.now();
     const record = {
         payload,
@@ -122,12 +122,14 @@ async function refreshSnapshot(reason) {
         cacheAgeMs,
         cacheExpiresInMs: exports.CACHE_TTL_MS,
         cacheStale: false,
-        generatedAt: new Date(now).toISOString()
+        generatedAt: new Date(now).toISOString(),
+        requestId: correlationId
     };
     (0, logger_1.logInfo)('ephemeris_refresh', {
         backend,
         reason,
-        responseTimeMs: payload.metadata.responseTimeMs
+        responseTimeMs: payload.metadata.responseTimeMs,
+        requestId: correlationId
     });
     return {
         payload,
@@ -136,7 +138,7 @@ async function refreshSnapshot(reason) {
         cacheAgeMs
     };
 }
-function decoratePayloadMetadata(payload, cacheState, backend, cacheAgeMs) {
+function decoratePayloadMetadata(payload, cacheState, backend, cacheAgeMs, correlationId) {
     const baseMetadata = payload.metadata ?? {};
     return {
         ...payload,
@@ -147,6 +149,7 @@ function decoratePayloadMetadata(payload, cacheState, backend, cacheAgeMs) {
             cacheAgeMs,
             cacheExpiresInMs: Math.max(0, exports.CACHE_TTL_MS - cacheAgeMs),
             cacheStale: cacheState === 'STALE',
+            requestId: correlationId ?? baseMetadata.requestId,
             generatedAt: baseMetadata.generatedAt ?? new Date(Date.now() - cacheAgeMs).toISOString()
         }
     };
@@ -169,7 +172,7 @@ async function getSnapshot(options) {
                     });
                 }
                 return {
-                    payload: decoratePayloadMetadata(cached.payload, cacheState, backend, cacheAgeMs),
+                    payload: decoratePayloadMetadata(cached.payload, cacheState, backend, cacheAgeMs, options?.correlationId),
                     cacheState,
                     cacheBackend: backend,
                     cacheAgeMs
@@ -178,10 +181,48 @@ async function getSnapshot(options) {
         }
     }
     if (!inflightPromise) {
-        inflightPromise = refreshSnapshot(options?.forceRefresh ? 'manual-refresh' : 'miss');
+        inflightPromise = refreshSnapshot(options?.forceRefresh ? 'manual-refresh' : 'miss', options?.correlationId);
     }
     try {
-        return await inflightPromise;
+        const result = await inflightPromise;
+        const payload = decoratePayloadMetadata(result.payload, result.cacheState, result.cacheBackend, result.cacheAgeMs, options?.correlationId ?? result.payload?.metadata?.requestId);
+        return {
+            ...result,
+            payload
+        };
+    }
+    catch (err) {
+        const cached = memoryCache ?? (await readCache());
+        if (cached) {
+            const cacheAgeMs = now - cached.cachedAt;
+            const payload = decoratePayloadMetadata(cached.payload, 'FROZEN', backend, cacheAgeMs, options?.correlationId);
+            payload.metadata = {
+                ...payload.metadata,
+                cacheStale: true,
+                cacheExpiresInMs: 0,
+                frozenSnapshot: true,
+                freezeReason: err?.message ?? 'Erreur inconnue lors du fetch Horizons',
+                requestId: options?.correlationId
+            };
+            (0, logger_1.logWarn)('ephemeris_snapshot_frozen', {
+                backend,
+                cacheAgeMs,
+                requestId: options?.correlationId,
+                error: err?.message ?? String(err)
+            });
+            return {
+                payload,
+                cacheState: 'FROZEN',
+                cacheBackend: backend,
+                cacheAgeMs
+            };
+        }
+        (0, logger_1.logError)('ephemeris_refresh_failed', {
+            backend,
+            requestId: options?.correlationId,
+            error: err?.message ?? String(err)
+        });
+        throw err;
     }
     finally {
         inflightPromise = null;

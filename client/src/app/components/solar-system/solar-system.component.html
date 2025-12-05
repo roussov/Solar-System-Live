@@ -2,6 +2,21 @@
   <!-- Colonne gauche : contrôles + vue SVG + échelle -->
   <div class="left-pane">
     <div class="controls-stack">
+      <div class="status-banner frozen" *ngIf="frozenSnapshot">
+        <div class="status-title">Données gelées (snapshot)</div>
+        <p>
+          Les dernières éphémérides valides sont réutilisées car Horizons est indisponible.
+          <span *ngIf="freezeReason">Motif : {{ freezeReason }}.</span>
+          <span *ngIf="freshnessLabel">Fraîcheur : {{ freshnessLabel }}.</span>
+          <span *ngIf="lastRequestId">Requête #{{ lastRequestId }}</span>
+        </p>
+      </div>
+
+      <div class="status-banner error" *ngIf="!frozenSnapshot && errorMessage">
+        <div class="status-title">Erreur API Horizons</div>
+        <p>{{ errorMessage }}</p>
+      </div>
+
       <!-- Switch 2D / 3D -->
       <div
         class="controls"
@@ -218,6 +233,39 @@
           <title>{{ dp.planet.displayName }}</title>
         </circle>
       </g>
+
+      <!-- Sondes Voyager (positions héliocentriques) -->
+      <g class="voyagers" *ngIf="voyagerMarkers.length">
+        <g class="voyager-marker" *ngFor="let v of voyagerMarkers">
+          <line
+            [attr.x1]="v.x - 8"
+            [attr.y1]="v.y"
+            [attr.x2]="v.x + 8"
+            [attr.y2]="v.y"
+            [attr.stroke]="v.color"
+          ></line>
+          <line
+            [attr.x1]="v.x"
+            [attr.y1]="v.y - 8"
+            [attr.x2]="v.x"
+            [attr.y2]="v.y + 8"
+            [attr.stroke]="v.color"
+          ></line>
+          <circle
+            [attr.cx]="v.x"
+            [attr.cy]="v.y"
+            r="4"
+            [attr.fill]="v.color"
+            class="voyager-node"
+          ></circle>
+          <text [attr.x]="v.x + 10" [attr.y]="v.y - 6" class="voyager-label">
+            {{ v.name }}
+          </text>
+          <text [attr.x]="v.x + 10" [attr.y]="v.y + 8" class="voyager-distance">
+            {{ v.distanceLabel }}
+          </text>
+        </g>
+      </g>
     </svg>
 
     <!-- Échelle 1 UA -->
@@ -259,6 +307,180 @@
         Cliquez sur une planète dans la vue pour afficher ses caractéristiques
         physiques et orbitales.
       </p>
+    </div>
+
+      <div class="voyager-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Voyager 1 & 2</div>
+            <div class="panel-subtitle">Données NASA JPL Horizons (km & miles)</div>
+            <div class="badge" *ngIf="voyagerSourceBadge">{{ voyagerSourceBadge }}</div>
+          </div>
+          <div class="panel-actions">
+            <button type="button" class="ghost" (click)="triggerManualRefresh()">Rafraîchir</button>
+            <button type="button" class="ghost" (click)="copyVoyagerSnapshotAsJson()">Copier JSON</button>
+            <button type="button" class="ghost" (click)="exportVoyagerCsv()">Exporter CSV</button>
+          </div>
+        </div>
+
+        <div class="status-banner error" *ngIf="voyagerError">
+          <div class="status-title">Voyager indisponible</div>
+          <p>{{ voyagerError }}</p>
+        </div>
+        <div class="status-banner" *ngIf="copyStatus === 'success' && copyMessage">
+          {{ copyMessage }}
+        </div>
+        <div class="status-banner error" *ngIf="copyStatus === 'error' && copyMessage">
+          {{ copyMessage }}
+        </div>
+        <div class="status-banner" *ngIf="dsnError && !voyagerError">
+          <div class="status-title">DSN</div>
+          <p>{{ dsnError }}</p>
+        </div>
+
+        <div class="voyager-compare" *ngIf="voyagerViews.length === 2">
+          <div class="compare-title">Comparatif express</div>
+          <div class="compare-table">
+            <div class="compare-row head">
+              <div class="cell">Paramètre</div>
+              <div class="cell">Voyager 1</div>
+              <div class="cell">Voyager 2</div>
+            </div>
+            <div class="compare-row">
+              <div class="cell label">Distance Soleil</div>
+              <div class="cell">{{ voyagerViews[0].distanceFromSun.km | number:'1.0-0' }} km</div>
+              <div class="cell">{{ voyagerViews[1].distanceFromSun.km | number:'1.0-0' }} km</div>
+            </div>
+            <div class="compare-row">
+              <div class="cell label">Distance Terre</div>
+              <div class="cell">{{ voyagerViews[0].distanceFromEarth.km | number:'1.0-0' }} km</div>
+              <div class="cell">{{ voyagerViews[1].distanceFromEarth.km | number:'1.0-0' }} km</div>
+            </div>
+            <div class="compare-row">
+              <div class="cell label">Vitesse</div>
+              <div class="cell">{{ voyagerViews[0].speed.kmPerS | number:'1.2-2' }} km/s</div>
+              <div class="cell">{{ voyagerViews[1].speed.kmPerS | number:'1.2-2' }} km/s</div>
+            </div>
+            <div class="compare-row">
+              <div class="cell label">Latitude écliptique</div>
+              <div class="cell">{{ voyagerViews[0].trajectory.eclipticLatDeg | number:'1.1-1' }}°</div>
+              <div class="cell">{{ voyagerViews[1].trajectory.eclipticLatDeg | number:'1.1-1' }}°</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="voyager-cards">
+          <div class="voyager-card" *ngFor="let v of voyagerViews">
+          <div class="voyager-card-header">
+            <div class="voyager-name">{{ v.name }}</div>
+            <div class="voyager-id">Horizons ID : {{ v.horizonsId }}</div>
+            <div class="since-launch" *ngIf="v.sinceLaunchLabel">
+              Depuis le lancement : {{ v.sinceLaunchLabel }}
+            </div>
+          </div>
+          <div class="voyager-meta">
+            <span *ngIf="v.referenceFrame">Repère : {{ v.referenceFrame }}</span>
+            <span *ngIf="v.timestamp">Ts : {{ v.timestamp }}</span>
+            <span *ngIf="v.lightTime.oneWayMinutes !== null">
+              Aller radio ~ {{ v.lightTime.oneWayMinutes | number:'1.1-1' }} min
+            </span>
+            <span *ngIf="v.lightTime.twoWayMinutes !== null">
+              RT ~ {{ v.lightTime.twoWayMinutes | number:'1.1-1' }} min
+            </span>
+          </div>
+          <div class="voyager-rows">
+            <div class="voyager-row">
+              <div class="label">Distance Soleil</div>
+              <div class="value">
+                <span *ngIf="v.distanceFromSun.km !== null">{{ v.distanceFromSun.km | number:'1.0-0' }} km</span>
+                <span class="muted" *ngIf="v.distanceFromSun.au !== null"> · {{ v.distanceFromSun.au | number:'1.3-3' }} UA</span>
+              </div>
+            </div>
+            <div class="voyager-row">
+              <div class="label">Distance Terre</div>
+              <div class="value">
+                <span *ngIf="v.distanceFromEarth.km !== null">{{ v.distanceFromEarth.km | number:'1.0-0' }} km</span>
+                <span class="muted" *ngIf="v.distanceFromEarth.au !== null"> · {{ v.distanceFromEarth.au | number:'1.3-3' }} UA</span>
+                <span class="chip subtle" *ngIf="v.distanceFromEarth.lightTimeMin !== null">
+                  Aller radio ≈ {{ v.distanceFromEarth.lightTimeMin | number:'1.1-1' }} min
+                </span>
+              </div>
+            </div>
+            <div class="voyager-row">
+              <div class="label">Aller/retour lumière</div>
+              <div class="value">
+                <span *ngIf="v.lightTime.oneWayMinutes !== null">One-way {{ v.lightTime.oneWayMinutes | number:'1.1-1' }} min</span>
+                <span *ngIf="v.lightTime.twoWayMinutes !== null"> · RT {{ v.lightTime.twoWayMinutes | number:'1.1-1' }} min</span>
+                <span class="muted" *ngIf="v.communication?.rtltSeconds">
+                  (DSN rtlt {{ (v.communication.rtltSeconds / 60) | number:'1.1-1' }} min)
+                </span>
+              </div>
+            </div>
+            <div class="voyager-row">
+              <div class="label">Trajectoire</div>
+              <div class="value trajectory">
+                <span *ngIf="v.trajectory.eclipticLatDeg !== null">Lat écliptique {{ v.trajectory.eclipticLatDeg | number:'1.1-1' }}°</span>
+                <span *ngIf="v.trajectory.eclipticLonDeg !== null"> · Lon {{ v.trajectory.eclipticLonDeg | number:'1.1-1' }}°</span>
+                <span class="chip subtle" *ngIf="v.trajectory.velocityAzimuthDeg !== null">
+                  Cap vitesse {{ v.trajectory.velocityAzimuthDeg | number:'1.0-0' }}°
+                </span>
+                <span class="chip subtle" *ngIf="v.trajectory.velocityLatDeg !== null">
+                  Inclinaison {{ v.trajectory.velocityLatDeg | number:'1.1-1' }}°
+                </span>
+              </div>
+            </div>
+            <div class="voyager-row">
+              <div class="label">Vitesse</div>
+              <div class="value">
+                <span *ngIf="v.speed.kmPerS !== null">{{ v.speed.kmPerS | number:'1.2-2' }} km/s</span>
+                <span class="muted" *ngIf="v.speed.auPerDay !== null"> · {{ v.speed.auPerDay | number:'1.4-4' }} UA/j</span>
+              </div>
+            </div>
+            <div class="voyager-row comm-row">
+              <div class="label">DSN</div>
+              <div class="value" *ngIf="v.communication; else noComm">
+                <div class="comm-line">
+                  <span class="chip">{{ v.communication?.station || 'Station inconnue' }} · {{ v.communication?.dish }}</span>
+                  <span *ngIf="v.communication?.band">Bande {{ v.communication.band }}</span>
+                  <span *ngIf="v.communication?.downlinkRate !== null">{{ v.communication.downlinkRate | number:'1.0-0' }} bps</span>
+                  <span *ngIf="v.communication?.snrDb !== null">Puissance {{ v.communication.snrDb | number:'1.0-1' }} dBm</span>
+                  <span class="muted" *ngIf="v.communication?.activity">({{ v.communication.activity }})</span>
+                </div>
+              </div>
+              <ng-template #noComm>
+                <div class="value muted">Pas de contact actif dans DSN Now.</div>
+              </ng-template>
+            </div>
+          </div>
+          <div class="sparkline-block" *ngIf="v.spark24hPath || v.spark7dPath">
+            <div class="sparkline" *ngIf="v.spark24hPath">
+              <div class="spark-label">Distance (24h)</div>
+              <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                <path [attr.d]="v.spark24hPath" />
+              </svg>
+            </div>
+            <div class="sparkline" *ngIf="v.spark7dPath">
+              <div class="spark-label">Distance (7 j)</div>
+              <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                <path [attr.d]="v.spark7dPath" />
+              </svg>
+            </div>
+          </div>
+          <div class="voyager-milestones" *ngIf="v.milestones?.length">
+            <div class="milestone-title">Jalons</div>
+            <div class="milestone-list">
+              <div class="milestone-item" *ngFor="let m of v.milestones">
+                <span class="dot"></span>
+                <span class="label">{{ m.label }}</span>
+                <span class="since">{{ m.since }}</span>
+              </div>
+            </div>
+            <div class="since-launch" *ngIf="v.distanceSinceLaunchKm !== null">
+              Distance franchie ~ {{ v.distanceSinceLaunchKm | number:'1.0-0' }} km
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
